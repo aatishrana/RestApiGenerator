@@ -30,12 +30,12 @@ type RelationType struct {
 
 type Relation struct {
 	ID                int `sql:"AUTO_INCREMENT"`
-	ParentEntityID    int `sql:"type:int(100)"`
-	ParentEntityColID int `sql:"type:int(100)"`
-	ChildEntityID     int `sql:"type:int(100)"`
-	ChildEntityColID  int `sql:"type:int(100)"`
-	InterEntityID     int `sql:"type:int(100)"`
-	RelationTypeID    int `sql:"type:int(10)"`
+	ParentEntityID    int `sql:"type:int(100)" gorm:"unique_index:idx_all_relation"`
+	ParentEntityColID int `sql:"type:int(100)" gorm:"unique_index:idx_all_relation"`
+	ChildEntityID     int `sql:"type:int(100)" gorm:"unique_index:idx_all_relation"`
+	ChildEntityColID  int `sql:"type:int(100)" gorm:"unique_index:idx_all_relation"`
+	InterEntityID     int `sql:"type:int(100)" gorm:"unique_index:idx_all_relation"`
+	RelationTypeID    int `sql:"type:int(10)" gorm:"unique_index:idx_all_relation"`
 
 	ParentEntity Entity `gorm:"ForeignKey:ParentEntityID"`       //belong to
 	ChildEntity  Entity `gorm:"ForeignKey:ChildEntityID"`        //belong to
