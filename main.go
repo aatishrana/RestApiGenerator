@@ -103,8 +103,8 @@ func upsertSampleData() {
 			return
 		}
 
-		parentFieldErr := database.SQL.First(&parentField, "name=(?) && entity_id=(?)", val.ParentEntityField, parent.ID).Error
-		childFieldErr := database.SQL.First(&childField, "name=(?) && entity_id=(?)", val.ChildEntityField, child.ID).Error
+		parentFieldErr := database.SQL.First(&parentField, "name=(?) AND entity_id=(?)", val.ParentEntityField, parent.ID).Error
+		childFieldErr := database.SQL.First(&childField, "name=(?) AND entity_id=(?)", val.ChildEntityField, child.ID).Error
 
 		if parentFieldErr != nil || childFieldErr != nil {
 			return
@@ -114,7 +114,7 @@ func upsertSampleData() {
 			ParentEntityID:    parent.ID,
 			ParentEntityColID: parentField.ID,
 			ChildEntityID:     child.ID,
-			ChildEntityColID:  child.ID,
+			ChildEntityColID:  childField.ID,
 			RelationTypeID:    app.Relations[k].Type,
 		}
 
