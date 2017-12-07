@@ -2,8 +2,8 @@ package generator
 
 type Entity struct {
 	ID          int `sql:"AUTO_INCREMENT"`
-	Name        string `sql:"type:varchar(30)"  gorm:"column:alias_name"`
-	DisplayName string `sql:"type:varchar(30)"`
+	Name        string `sql:"type:varchar(30)"  gorm:"column:name;not null;unique"`
+	DisplayName string `sql:"type:varchar(30)" gorm:"column:display_name"`
 	Columns     []Column `gorm:"ForeignKey:entity_id;AssociationForeignKey:id"` // one to many, has many columns
 }
 
@@ -14,12 +14,13 @@ type ColumnType struct {
 }
 
 type Column struct {
-	ID         int `sql:"AUTO_INCREMENT"`
-	Name       string `sql:"type:varchar(30)"`
-	Size       uint `sql:"type:int(30)"`
-	TypeID     uint `sql:"type:int(30)"`
-	EntityID   uint `sql:"type:int(100)"`
-	ColumnType ColumnType `gorm:"ForeignKey:TypeID"` //belong to (for reverse access)
+	ID          int `sql:"AUTO_INCREMENT"`
+	Name        string `sql:"type:varchar(30)" gorm:"unique_index:idx_name_entity_id"`
+	DisplayName string `sql:"type:varchar(30)"`
+	Size        int `sql:"type:int(30)"`
+	TypeID      int `sql:"type:int(30)"`
+	EntityID    int `sql:"type:int(100)" gorm:"unique_index:idx_name_entity_id"`
+	ColumnType  ColumnType `gorm:"ForeignKey:TypeID"` //belong to (for reverse access)
 }
 
 type RelationType struct {

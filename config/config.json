@@ -27,7 +27,7 @@
     "KeyFile": "tls/server.key"
   },
   "AppInfo": {
-    "_comment": "This is a sample data for generating the application, if your schema is not ready yet you can remove this and add you app entities data later.",
+    "_comment": "This is a sample data for generating the application, if your schema is not ready yet you can empty this and add you app entities data later.",
     "Name": "MyRestApp",
     "Entities": [
       {
