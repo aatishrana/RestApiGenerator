@@ -6,7 +6,6 @@ import (
 	"database"
 	"server"
 	"encoding/json"
-	"fmt"
 	"appinfo"
 	"generator"
 	"flag"
@@ -48,7 +47,7 @@ func main() {
 		upsertSampleData()
 	}
 
-	fmt.Println(config.AppInfo.Name, "generated!!")
+	generator.GenerateCode(config.AppInfo.Name)
 }
 
 func upsertSampleData() {
