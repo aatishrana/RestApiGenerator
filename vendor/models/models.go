@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"encoding/json"
 	"strings"
+	"router"
 )
 
 const(
@@ -18,12 +19,12 @@ type Response struct {
 
 // Load forces the program to call all the init() funcs in each models file
 func Load() {
-	//router.Get("/", Welcome)
+	router.Get("/", Welcome)
 }
 
 func Welcome(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(Response{2000, "Welcome to xShowroom", nil})
+	json.NewEncoder(w).Encode(Response{2000, "Welcome", nil})
 }
 
 func isValueInList(value string, list []string) bool {

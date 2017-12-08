@@ -4,24 +4,14 @@ import (
 	"os"
 	"jsonconfig"
 	"database"
-	"server"
-	"encoding/json"
-	"appinfo"
 	"generator"
 	"flag"
+	"config"
 )
 
-type configuration struct {
-	Database database.Info
-	Server   server.Server
-	AppInfo  appinfo.AppInfo
-}
 
-func (c *configuration) ParseJSON(b []byte) error {
-	return json.Unmarshal(b, &c)
-}
 
-var config = &configuration{}
+var con = &config.Configuration{}
 
 func main() {
 
@@ -30,10 +20,10 @@ func main() {
 	flag.Parse()
 
 	// Load the configuration file
-	jsonconfig.Load("config"+string(os.PathSeparator)+"config.json", config)
+	jsonconfig.Load("config"+string(os.PathSeparator)+"config.json", con)
 
 	// Connect to database
-	database.Connect(config.Database)
+	database.Connect(con.Database)
 
 	// Migrate tables
 	database.SQL.AutoMigrate(&generator.Entity{},
@@ -47,11 +37,11 @@ func main() {
 		upsertSampleData()
 	}
 
-	generator.GenerateCode(config.AppInfo.Name)
+	generator.GenerateCode(con.AppInfo.Name)
 }
 
 func upsertSampleData() {
-	app := &config.AppInfo
+	app := &con.AppInfo
 
 	if app == nil {
 		return
