@@ -12,6 +12,13 @@ import (
 	"strconv"
 )
 
+var const_ConfigPath = "config"
+var const_JsonConfigPath = "jsonconfig"
+var const_DatabasePath = "database"
+var const_ModelsPath = "models"
+var const_ServerPath = "server"
+var const_RoutePath = "route"
+
 type Entity struct {
 	ID          int `sql:"AUTO_INCREMENT"`
 	Name        string `sql:"type:varchar(30)"  gorm:"column:name;not null;unique"`
@@ -154,8 +161,8 @@ func createAppMainMainMethod(appMain *File, allModels []string) {
 	appMain.Func().Id("main").Params().Block(
 
 		Comment("Load the configuration file"),
-		Qual("jsonconfig", "Load").Call(
-			Lit("config").
+		Qual(const_JsonConfigPath, "Load").Call(
+			Lit(const_ConfigPath).
 				Op("+").
 				Id("string").
 				Op("(").
@@ -168,19 +175,19 @@ func createAppMainMainMethod(appMain *File, allModels []string) {
 		Empty(),
 
 		Comment("Connect to database"),
-		Qual("database", "Connect").Call(
+		Qual(const_DatabasePath, "Connect").Call(
 			Id("conf").Op(".").Id("Database"),
 		),
 
 		Empty(),
 
 		Comment("Load the controller routes"),
-		Qual("models", "Load").Call(),
+		Qual(const_ModelsPath, "Load").Call(),
 
 		Empty(),
 
 		Comment("Auto migrate all models"),
-		Qual("database", "SQL.AutoMigrate").CallFunc(func(g *Group) {
+		Qual(const_DatabasePath, "SQL.AutoMigrate").CallFunc(func(g *Group) {
 			for _, value := range allModels {
 				g.Id("&" + "models." + value + "{}")
 			}
@@ -189,9 +196,9 @@ func createAppMainMainMethod(appMain *File, allModels []string) {
 		Empty(),
 
 		Comment("Start the listener"),
-		Qual("server", "Run").Call(
-			Qual("route", "LoadHTTP").Call(),
-			Qual("route", "LoadHTTPS").Call(),
+		Qual(const_ServerPath, "Run").Call(
+			Qual(const_RoutePath, "LoadHTTP").Call(),
+			Qual(const_RoutePath, "LoadHTTPS").Call(),
 			Id("conf").Op(".").Id("Server"),
 		),
 	)
@@ -401,7 +408,7 @@ func createEntities(entity Entity, db *gorm.DB) string {
 
 				if method.Type == "OneToMany" || method.Type == "OneToOne_normal" {
 					g.Id("data").Op(":= []").Id(method.SubEntityName).Id("{}")
-					g.Qual("database", "SQL.Find").Call(Id("&").Id("data"), Lit(" "+method.SubEntityColName+" = ?"), Id("ID"))
+					g.Qual(const_DatabasePath, "SQL.Find").Call(Id("&").Id("data"), Lit(" "+method.SubEntityColName+" = ?"), Id("ID"))
 					g.Qual("", "w.Header().Set").Call(Lit("Content-Type"), Lit("application/json"))
 					g.Qual("encoding/json", "NewEncoder").Call(Id("w")).Op(".").Id("Encode").Call(Id("Response").
 						Op("{").
@@ -415,9 +422,9 @@ func createEntities(entity Entity, db *gorm.DB) string {
 					g.Id(strings.ToLower(entityName)).Op(":=").Id(entityName).Op("{").Id("Id").Op(":").Id("uint(").Id("ID").Op(")}")
 
 					g.Id("data").Op(":= ").Id(method.SubEntityName).Id("{}")
-					g.Qual("database", "SQL.Find").Call(
+					g.Qual(const_DatabasePath, "SQL.Find").Call(
 						Id("&").Id("data"), Lit(" id = (?)"),
-						Qual("database", "SQL.Select").Call(Lit(method.SubEntityColName)).Op(".").Id("First").Call(Id("&").Id(strings.ToLower(entityName))).Op(".").Id("QueryExpr").Call(),
+						Qual(const_DatabasePath, "SQL.Select").Call(Lit(method.SubEntityColName)).Op(".").Id("First").Call(Id("&").Id(strings.ToLower(entityName))).Op(".").Id("QueryExpr").Call(),
 					)
 					g.Qual("", "w.Header().Set").Call(Lit("Content-Type"), Lit("application/json"))
 					g.Qual("encoding/json", "NewEncoder").Call(Id("w")).Op(".").Id("Encode").Call(Id("Response").
@@ -430,7 +437,7 @@ func createEntities(entity Entity, db *gorm.DB) string {
 
 				if method.Type == "OneToOne_self" {
 					g.Id("data").Op(":= ").Id(method.SubEntityName).Id("{}")
-					g.Qual("database", "SQL.Find").Call(Id("&").Id("data"), Lit(" "+method.SubEntityColName+" = ?"), Id("ID"))
+					g.Qual(const_DatabasePath, "SQL.Find").Call(Id("&").Id("data"), Lit(" "+method.SubEntityColName+" = ?"), Id("ID"))
 					g.Qual("", "w.Header().Set").Call(Lit("Content-Type"), Lit("application/json"))
 					g.Qual("encoding/json", "NewEncoder").Call(Id("w")).Op(".").Id("Encode").Call(Id("Response").
 						Op("{").
@@ -445,8 +452,8 @@ func createEntities(entity Entity, db *gorm.DB) string {
 					relation := method.SubEntityName + "s"
 
 					g.Id("data").Op(":=").Id(entityName).Id("{}")
-					g.Qual("database", "SQL.Find").Call(Id("&").Id("data"), Id("ID"))
-					g.Qual("database", "SQL.Model").Call(Id("&").Id("data")).Op(".").Id("Association").Call(Lit(relation)).
+					g.Qual(const_DatabasePath, "SQL.Find").Call(Id("&").Id("data"), Id("ID"))
+					g.Qual(const_DatabasePath, "SQL.Model").Call(Id("&").Id("data")).Op(".").Id("Association").Call(Lit(relation)).
 						Op(".").Id("Find").Call(Id("&").Id("data").Op(".").Id(relation))
 					g.Qual("", "w.Header().Set").Call(Lit("Content-Type"), Lit("application/json"))
 					g.Qual("encoding/json", "NewEncoder").Call(Id("w")).Op(".").Id("Encode").Call(Id("Response").
@@ -488,7 +495,7 @@ func createEntitiesGetAllMethod(modelFile *File, entityName string, methodName s
 	modelFile.Func().Id(methodName).Params(handlerRequestParams()).Block(
 		modelFile.Empty(),
 		Id("data").Op(":=").Op("[]").Id(entityName).Op("{}"),
-		Qual("database", "SQL.Find").Call(Id("&").Id("data")),
+		Qual(const_DatabasePath, "SQL.Find").Call(Id("&").Id("data")),
 		setJsonHeader(),
 		sendResponse(2000, "Data fetched successfully", Id("data")),
 	)
@@ -504,7 +511,7 @@ func createEntitiesGetMethod(modelFile *File, entityName string, methodName stri
 		Id("params").Op(":=").Qual("router", "Params").Call(Id("req")),
 		Id("ID").Op(":=").Qual("", "params.ByName").Call(Lit("id")),
 		Id("data").Op(":=").Id(entityName).Op("{}"),
-		Qual("database", "SQL.First").Call(Id("&").Id("data"), Id("ID")),
+		Qual(const_DatabasePath, "SQL.First").Call(Id("&").Id("data"), Id("ID")),
 		setJsonHeader(),
 		sendResponse(2000, "Data fetched successfully", Id("data")),
 	)
@@ -525,7 +532,7 @@ func createEntitiesPostMethod(modelFile *File, entityName string, methodName str
 			Return(),
 		),
 		Defer().Qual("", "req.Body.Close").Call(),
-		Qual("database", "SQL.Create").Call(Id("&").Id("data")),
+		Qual(const_DatabasePath, "SQL.Create").Call(Id("&").Id("data")),
 		setJsonHeader(),
 		sendResponse(2000, "Data saved successfully", "data saved"),
 	)
@@ -560,7 +567,7 @@ func createEntitiesPutMethod(modelFile *File, entityName string, methodName stri
 
 		Empty(),
 		Comment("Update record"),
-		Qual("database", "SQL.Model").Call(Id("&oldData")).Op(".").Id("Updates").Call(Id("newData")),
+		Qual(const_DatabasePath, "SQL.Model").Call(Id("&oldData")).Op(".").Id("Updates").Call(Id("newData")),
 		setJsonHeader(),
 		sendResponse(2000, "Data updated successfully", Id("nil")),
 
@@ -581,7 +588,7 @@ func createEntitiesDeleteMethod(modelFile *File, entityName string, methodName s
 			Id("0"),
 		),
 		Id("data").Op(":=").Id(entityName).Op("{").Id("Id").Op(":").Id("uint(ID)").Op("}"),
-		Qual("database", "SQL.Delete").Call(Id("&").Id("data")),
+		Qual(const_DatabasePath, "SQL.Delete").Call(Id("&").Id("data")),
 		setJsonHeader(),
 		sendResponse(2000, "Data deleted successfully", Id("nil")),
 	)
@@ -642,7 +649,7 @@ func createEntitiesAllChildMethod(modelFile *File, entityName string, allMethodN
 				buffer.WriteString("Preload(relations[" + strconv.Itoa(i) + "]).")
 			}
 			buffer.WriteString("First")
-			g.Qual("database", buffer.String()).Call(Op("&").Id("data"))
+			g.Qual(const_DatabasePath, buffer.String()).Call(Op("&").Id("data"))
 		})
 		g.Qual("", "w.Header().Set").Call(Lit("Content-Type"), Lit("application/json"))
 		g.Qual("encoding/json", "NewEncoder").Call(Id("w")).Op(".").Id("Encode").Call(Id("Response").
