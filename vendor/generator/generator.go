@@ -81,12 +81,12 @@ func GenerateCode(appName string) {
 		Find(&entities)
 
 	//print all entities
-	//for _, entity := range entities {
-	//	fmt.Print(entity.Name + " (" + entity.DisplayName + ")\n")
-	//	for _, col := range entity.Columns {
-	//		fmt.Print("\t", col.Name, " ", col.ColumnType.Type, "(", col.Size, ")\n")
-	//	}
-	//}
+	for _, entity := range entities {
+		fmt.Print(entity.Name + " (" + entity.DisplayName + ")\n")
+		for _, col := range entity.Columns {
+			fmt.Print("\t", col.Name, " ", col.ColumnType.Type, "(", col.Size, ")\n")
+		}
+	}
 
 	allModels := make([]string, 0)
 	//creating entity structures
@@ -168,11 +168,11 @@ func createAppMainMainMethod(appMain *File, allModels []string) {
 
 		Empty(),
 
-		//Comment("Start the listener"),
-		//Qual("shared/server", "Run").Call(
-		//	Qual("route", "LoadHTTP").Call(),
-		//	Qual("route", "LoadHTTPS").Call(),
-		//	Id("config").Op(".").Id("Server"),
-		//),
+		Comment("Start the listener"),
+		Qual("server", "Run").Call(
+			Qual("route", "LoadHTTP").Call(),
+			Qual("route", "LoadHTTPS").Call(),
+			Id("config").Op(".").Id("Server"),
+		),
 	)
 }
