@@ -1,21 +1,13 @@
-package models
+package controllers
 
 import (
-	"net/http"
-	"encoding/json"
-	"strings"
+	"log"
+	"strconv"
 	"router"
+	"net/http"
+	"strings"
+	"encoding/json"
 )
-
-const(
-	sep = ","
-)
-
-type Response struct {
-	StatusCode    uint            `json:"status_code"`
-	StatusMessage string        `json:"status_message"`
-	Data          interface{}    `json:"data"`
-}
 
 // Load forces the program to call all the init() funcs in each models file
 func Load() {
@@ -24,7 +16,7 @@ func Load() {
 
 func Welcome(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(Response{2000, "Welcome", nil})
+	json.NewEncoder(w).Encode("Welcome")
 }
 
 func isValueInList(value string, list []string) bool {
@@ -34,4 +26,14 @@ func isValueInList(value string, list []string) bool {
 		}
 	}
 	return false
+}
+
+func StringToUInt(ID string) uint {
+	u64, err := strconv.ParseUint(ID, 10, 32)
+	if err != nil {
+		log.Println(err)
+		return 0
+	}
+	wd := uint(u64)
+	return wd
 }

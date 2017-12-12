@@ -16,6 +16,7 @@ var const_ConfigPath = "config"
 var const_JsonConfigPath = "jsonconfig"
 var const_DatabasePath = "database"
 var const_ModelsPath = "models"
+var const_ControllersPath = "controllers"
 var const_ServerPath = "server"
 var const_RoutePath = "route"
 var const_RouterPath = "router"
@@ -195,14 +196,14 @@ func createAppMainMainMethod(appMain *File, allModels []string) {
 		Empty(),
 
 		Comment("Load the controller routes"),
-		Qual(const_ModelsPath, "Load").Call(),
+		Qual(const_ControllersPath, "Load").Call(),
 
 		Empty(),
 
 		Comment("Auto migrate all models"),
 		Qual(const_DatabasePath, "SQL.AutoMigrate").CallFunc(func(g *Group) {
 			for _, value := range allModels {
-				g.Id("&" + "models." + value + "{}")
+				g.Id("&").Qual(const_ModelsPath, value+"{}")
 			}
 		}),
 
@@ -236,8 +237,18 @@ func createEntities(entity Entity, db *gorm.DB) string {
 	}
 	defer file.Close()
 
+	//create controller entity file in controller sub directory
+	file2, err2 := os.Create("vendor/controllers/" + entityName + ".go")
+	if err2 != nil {
+		log.Fatal("Cannot create file", err2)
+	}
+	defer file2.Close()
+
 	//set package as "models"
 	modelFile := NewFile("models")
+
+	//set package as "models"
+	controllerFile := NewFile("controllers")
 
 	//fetch relations of this entity matching parent
 	relationsParent := []Relation{}
@@ -341,72 +352,71 @@ func createEntities(entity Entity, db *gorm.DB) string {
 
 	specialMethods := []EntityRelationMethod{}
 
-	//modelFile.Empty()
-	////write routes in init method
-	//modelFile.Comment("Routes related to " + entityName)
-	//modelFile.Func().Id("init").Params().BlockFunc(func(g *Group) {
-	//
-	//	g.Empty()
-	//	g.Comment("Standard routes")
-	//	g.Qual(const_RouterPath, "Get").Call(Lit("/"+strings.ToLower(entityName)), Id(getAllMethodName))
-	//	g.Qual(const_RouterPath, "Get").Call(Lit("/"+strings.ToLower(entityName)+"/:id"), Id(getByIdMethodName))
-	//	g.Qual(const_RouterPath, "Post").Call(Lit("/"+strings.ToLower(entityName)), Id(postMethodName))
-	//	g.Qual(const_RouterPath, "Put").Call(Lit("/"+strings.ToLower(entityName)+"/:id"), Id(putMethodName))
-	//	g.Qual(const_RouterPath, "Delete").Call(Lit("/"+strings.ToLower(entityName)+"/:id"), Id(deleteMethodName))
-	//
-	//	if len(entityRelationsForEachEndpoint) > 0 {
-	//		g.Empty()
-	//		g.Comment("Sub entities routes")
-	//		for _, entRel := range entityRelationsForEachEndpoint {
-	//
-	//			if entRel.Type == const_OneToMany {
-	//				methodName := "Get" + entityName + entRel.SubEntityName + "s"
-	//				specialMethods = append(specialMethods, EntityRelationMethod{methodName, entRel.Type, entRel.SubEntityName, entRel.SubEntityColName})
-	//				g.Empty()
-	//				g.Comment("has many")
-	//				g.Qual(const_RouterPath, "Get").Call(Lit("/"+strings.ToLower(entityName)+"/:id/"+strings.ToLower(entRel.SubEntityName+"s")), Id(methodName))
-	//			} else if entRel.Type == const_OneToOne+const_normal || entRel.Type == const_OneToOne+const_self || entRel.Type == const_OneToOne+const_reverse {
-	//				methodName := "Get" + entityName + entRel.SubEntityName
-	//				specialMethods = append(specialMethods, EntityRelationMethod{methodName, entRel.Type, entRel.SubEntityName, entRel.SubEntityColName})
-	//				g.Empty()
-	//				g.Comment("has one")
-	//				g.Qual(const_RouterPath, "Get").Call(Lit("/"+strings.ToLower(entityName)+"/:id/"+strings.ToLower(entRel.SubEntityName)), Id(methodName))
-	//			} else if entRel.Type == const_ManyToOne {
-	//				methodName := "Get" + entityName + entRel.SubEntityName + ""
-	//				specialMethods = append(specialMethods, EntityRelationMethod{methodName, entRel.Type, entRel.SubEntityName, entRel.SubEntityColName})
-	//				g.Empty()
-	//				g.Comment("belongs to")
-	//				g.Qual(const_RouterPath, "Get").Call(Lit("/"+strings.ToLower(entityName)+"/:id/"+strings.ToLower(entRel.SubEntityName)), Id(methodName))
-	//			} else if entRel.Type == const_ManyToMany {
-	//				methodName := "Get" + entityName + entRel.SubEntityName + "s"
-	//				specialMethods = append(specialMethods, EntityRelationMethod{methodName, entRel.Type, entRel.SubEntityName, entRel.SubEntityColName})
-	//				g.Empty()
-	//				g.Comment("has many to many")
-	//				g.Qual(const_RouterPath, "Get").Call(Lit("/"+strings.ToLower(entityName)+"/:id/"+strings.ToLower(entRel.SubEntityName)), Id(methodName))
-	//			}
-	//
-	//		}
-	//	}
-	//
-	//	if len(entityRelationsForAllEndpoint) > 0 {
-	//		allMethodExist = true
-	//		g.Empty()
-	//		g.Comment("extra route")
-	//		g.Qual(const_RouterPath, "Get").Call(Lit("/"+strings.ToLower(entityName)+"/:id/all"), Id(allMethodName))
-	//	}
-	//})
+	//write routes in init method
+	controllerFile.Comment("Routes related to " + entityName)
+	controllerFile.Func().Id("init").Params().BlockFunc(func(g *Group) {
+
+		g.Empty()
+		g.Comment("Standard routes")
+		g.Qual(const_RouterPath, "Get").Call(Lit("/"+strings.ToLower(entityName)), Id(getAllMethodName))
+		g.Qual(const_RouterPath, "Get").Call(Lit("/"+strings.ToLower(entityName)+"/:id"), Id(getByIdMethodName))
+		g.Qual(const_RouterPath, "Post").Call(Lit("/"+strings.ToLower(entityName)), Id(postMethodName))
+		g.Qual(const_RouterPath, "Put").Call(Lit("/"+strings.ToLower(entityName)+"/:id"), Id(putMethodName))
+		g.Qual(const_RouterPath, "Delete").Call(Lit("/"+strings.ToLower(entityName)+"/:id"), Id(deleteMethodName))
+
+		//if len(entityRelationsForEachEndpoint) > 0 {
+		//	g.Empty()
+		//	g.Comment("Sub entities routes")
+		//	for _, entRel := range entityRelationsForEachEndpoint {
+		//
+		//		if entRel.Type == const_OneToMany {
+		//			methodName := "Get" + entityName + entRel.SubEntityName + "s"
+		//			specialMethods = append(specialMethods, EntityRelationMethod{methodName, entRel.Type, entRel.SubEntityName, entRel.SubEntityColName})
+		//			g.Empty()
+		//			g.Comment("has many")
+		//			g.Qual(const_RouterPath, "Get").Call(Lit("/"+strings.ToLower(entityName)+"/:id/"+strings.ToLower(entRel.SubEntityName+"s")), Id(methodName))
+		//		} else if entRel.Type == const_OneToOne+const_normal || entRel.Type == const_OneToOne+const_self || entRel.Type == const_OneToOne+const_reverse {
+		//			methodName := "Get" + entityName + entRel.SubEntityName
+		//			specialMethods = append(specialMethods, EntityRelationMethod{methodName, entRel.Type, entRel.SubEntityName, entRel.SubEntityColName})
+		//			g.Empty()
+		//			g.Comment("has one")
+		//			g.Qual(const_RouterPath, "Get").Call(Lit("/"+strings.ToLower(entityName)+"/:id/"+strings.ToLower(entRel.SubEntityName)), Id(methodName))
+		//		} else if entRel.Type == const_ManyToOne {
+		//			methodName := "Get" + entityName + entRel.SubEntityName + ""
+		//			specialMethods = append(specialMethods, EntityRelationMethod{methodName, entRel.Type, entRel.SubEntityName, entRel.SubEntityColName})
+		//			g.Empty()
+		//			g.Comment("belongs to")
+		//			g.Qual(const_RouterPath, "Get").Call(Lit("/"+strings.ToLower(entityName)+"/:id/"+strings.ToLower(entRel.SubEntityName)), Id(methodName))
+		//		} else if entRel.Type == const_ManyToMany {
+		//			methodName := "Get" + entityName + entRel.SubEntityName + "s"
+		//			specialMethods = append(specialMethods, EntityRelationMethod{methodName, entRel.Type, entRel.SubEntityName, entRel.SubEntityColName})
+		//			g.Empty()
+		//			g.Comment("has many to many")
+		//			g.Qual(const_RouterPath, "Get").Call(Lit("/"+strings.ToLower(entityName)+"/:id/"+strings.ToLower(entRel.SubEntityName)), Id(methodName))
+		//		}
+		//
+		//	}
+		//}
+
+		//if len(entityRelationsForAllEndpoint) > 0 {
+		//	allMethodExist = true
+		//	g.Empty()
+		//	g.Comment("extra route")
+		//	g.Qual(const_RouterPath, "Get").Call(Lit("/"+strings.ToLower(entityName)+"/:id/all"), Id(allMethodName))
+		//}
+	})
 
 	createEntitiesChildSlice(modelFile, entityName, entityRelationsForAllEndpoint)
 
-	createEntitiesGetAllMethod(modelFile, entityName, getAllMethodName)
+	createEntitiesGetAllMethod(modelFile, entityName, getAllMethodName, controllerFile)
 
-	createEntitiesGetMethod(modelFile, entityName, getByIdMethodName)
+	createEntitiesGetMethod(modelFile, entityName, getByIdMethodName, controllerFile)
 
-	createEntitiesPostMethod(modelFile, entityName, postMethodName, entityFields)
+	createEntitiesPostMethod(modelFile, entityName, postMethodName, entityFields, controllerFile)
 
-	createEntitiesPutMethod(modelFile, entityName, putMethodName)
+	createEntitiesPutMethod(modelFile, entityName, putMethodName, controllerFile)
 
-	createEntitiesDeleteMethod(modelFile, entityName, deleteMethodName)
+	createEntitiesDeleteMethod(modelFile, entityName, deleteMethodName, controllerFile)
 
 	if len(specialMethods) > 0 {
 		for _, method := range specialMethods {
@@ -487,6 +497,7 @@ func createEntities(entity Entity, db *gorm.DB) string {
 	}
 
 	fmt.Fprintf(file, "%#v", modelFile)
+	fmt.Fprintf(file2, "%#v", controllerFile)
 
 	fmt.Println(entityName + " generated")
 	return entityName
@@ -503,7 +514,7 @@ func createEntitiesChildSlice(modelFile *File, entityName string, entityRelation
 	modelFile.Var().Id(entityName + "Children").Op("=").Lit(allChildren)
 }
 
-func createEntitiesGetAllMethod(modelFile *File, entityName string, methodName string) {
+func createEntitiesGetAllMethod(modelFile *File, entityName string, methodName string, controllerFile *File) {
 	modelFile.Empty()
 	//write getAll method
 	modelFile.Comment("This method will return a list of all " + entityName + "s")
@@ -512,9 +523,15 @@ func createEntitiesGetAllMethod(modelFile *File, entityName string, methodName s
 		Qual(const_DatabasePath, "SQL.Find").Call(Id("&").Id("data")),
 		Return(Id("data")),
 	)
+
+	controllerFile.Func().Id(methodName).Params(handlerRequestParams()).Block(
+		Id("data").Op(":=").Qual(const_ModelsPath, methodName).Call(),
+		setJsonHeader(),
+		sendResponse(Id("data")),
+	)
 }
 
-func createEntitiesGetMethod(modelFile *File, entityName string, methodName string) {
+func createEntitiesGetMethod(modelFile *File, entityName string, methodName string, controllerFile *File) {
 	modelFile.Empty()
 	//write getOne method
 	modelFile.Comment("This method will return one " + entityName + " based on id")
@@ -523,9 +540,18 @@ func createEntitiesGetMethod(modelFile *File, entityName string, methodName stri
 		Qual(const_DatabasePath, "SQL.First").Call(Id("&").Id("data"), Id("ID")),
 		Return(Id("data")),
 	)
+
+	controllerFile.Empty()
+	controllerFile.Func().Id(methodName).Params(handlerRequestParams()).Block(
+		Id("params").Op(":=").Qual(const_RouterPath, "Params").Call(Id("req")),
+		Id("ID").Op(":=").Qual("", "params.ByName").Call(Lit("id")),
+		Id("data").Op(":=").Qual(const_ModelsPath, methodName).Call(Qual("", "StringToUInt").Call(Id("ID"))),
+		setJsonHeader(),
+		sendResponse(Id("data")),
+	)
 }
 
-func createEntitiesPostMethod(modelFile *File, entityName string, methodName string, entityFields []EntityField) {
+func createEntitiesPostMethod(modelFile *File, entityName string, methodName string, entityFields []EntityField, controllerFile *File) {
 	modelFile.Empty()
 	//write insert method
 	modelFile.Comment("This method will insert one " + entityName + " in db")
@@ -533,9 +559,26 @@ func createEntitiesPostMethod(modelFile *File, entityName string, methodName str
 		Qual(const_DatabasePath, "SQL.Create").Call(Id("&").Id("data")),
 		Return(Id("data")),
 	)
+
+	// controller method
+	controllerFile.Empty()
+	controllerFile.Func().Id(methodName).Params(handlerRequestParams()).Block(
+		Id("decoder").Op(":=").Qual("encoding/json", "NewDecoder").Call(Id("req").Op(".").Id("Body")),
+		Var().Id("data").Qual(const_ModelsPath, entityName),
+		Id("err").Op(":=").Qual("", "decoder.Decode").Call(Id("&").Id("data")),
+		If(Id("err").Op("!=").Nil()).Block(
+			setJsonHeader(),
+			sendResponse("invalid data"),
+			Return(),
+		),
+		Defer().Qual("", "req.Body.Close").Call(),
+		Id("data").Op("=").Qual(const_ModelsPath, methodName).Call(Id("data")),
+		setJsonHeader(),
+		sendResponse(Id("data")),
+	)
 }
 
-func createEntitiesPutMethod(modelFile *File, entityName string, methodName string) {
+func createEntitiesPutMethod(modelFile *File, entityName string, methodName string, controllerFile *File) {
 	modelFile.Empty()
 	//write update method
 	modelFile.Comment("This method will update " + entityName + " based on id")
@@ -544,9 +587,34 @@ func createEntitiesPutMethod(modelFile *File, entityName string, methodName stri
 		Qual(const_DatabasePath, "SQL.Model").Call(Id("&oldData")).Op(".").Id("Updates").Call(Id("newData")),
 		Return(Id("newData")),
 	)
+
+	//controller method
+	controllerFile.Empty()
+	controllerFile.Func().Id(methodName).Params(handlerRequestParams()).Block(
+
+		Id("params").Op(":=").Qual(const_RouterPath, "Params").Call(Id("req")),
+		Id("ID").Op(":=").Qual("", "params.ByName").Call(Lit("id")),
+
+		Id("decoder").Op(":=").Qual("encoding/json", "NewDecoder").Call(Id("req").Op(".").Id("Body")),
+		Var().Id("newData").Qual(const_ModelsPath, entityName),
+		Id("err").Op(":=").Qual("", "decoder.Decode").Call(Id("&").Id("newData")),
+		If(Id("err").Op("!=").Nil()).Block(
+			setJsonHeader(),
+			sendResponse("invalid data"),
+			Return(),
+		),
+		Defer().Qual("", "req.Body.Close").Call(),
+
+		Empty(),
+		Id("newData.Id").Op("=").Qual("","StringToUInt").Call(Id("ID")),
+		Id("data").Op(":=").Qual(const_ModelsPath, methodName).Call(Id("newData")),
+		setJsonHeader(),
+		sendResponse(Id("data")),
+
+	)
 }
 
-func createEntitiesDeleteMethod(modelFile *File, entityName string, methodName string) {
+func createEntitiesDeleteMethod(modelFile *File, entityName string, methodName string, controllerFile *File) {
 	modelFile.Empty()
 	//write delete method
 	modelFile.Comment("This method will delete " + entityName + " based on id")
@@ -554,6 +622,18 @@ func createEntitiesDeleteMethod(modelFile *File, entityName string, methodName s
 		Id("data").Op(":=").Id(entityName).Op("{").Id("Id").Op(":").Id("ID").Op("}"),
 		Qual(const_DatabasePath, "SQL.Delete").Call(Id("&").Id("data")),
 		Return(Id("data")),
+	)
+
+	//controller method
+	controllerFile.Empty()
+	controllerFile.Func().Id(methodName).Params(handlerRequestParams()).Block(
+
+		Comment("Get the parameter id"),
+		Id("params").Op(":=").Qual(const_RouterPath, "Params").Call(Id("req")),
+		Id("ID").Op(":=").Qual("", "params.ByName").Call(Lit("id")),
+		Id("data").Op(":=").Qual(const_ModelsPath, methodName).Call(Qual("", "StringToUInt").Call(Id("ID"))),
+		setJsonHeader(),
+		sendResponse(Id("data")),
 	)
 }
 
@@ -678,11 +758,15 @@ func setJsonHeader() Code {
 	return Qual("", "w.Header().Set").Call(Lit("Content-Type"), Lit("application/json"))
 }
 
-func sendResponse(statusCode uint, statusMsg string, data interface{}) Code {
-	return Qual("encoding/json", "NewEncoder").Call(Id("w")).Op(".").Id("Encode").Call(Id("Response").
-		Op("{").
-		Lit(statusCode).Op(",").
-		Lit(statusMsg).Op(",").
-		Lit(data).
-		Op("}"))
+//func sendResponse(statusCode uint, statusMsg string, data interface{}) Code {
+//	return Qual("encoding/json", "NewEncoder").Call(Id("w")).Op(".").Id("Encode").Call(Id("Response").
+//		Op("{").
+//		Lit(statusCode).Op(",").
+//		Lit(statusMsg).Op(",").
+//		Lit(data).
+//		Op("}"))
+//}
+
+func sendResponse(data interface{}) Code {
+	return Qual("encoding/json", "NewEncoder").Call(Id("w")).Op(".").Id("Encode").Call(Lit(data))
 }
