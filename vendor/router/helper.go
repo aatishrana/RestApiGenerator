@@ -31,3 +31,7 @@ func Post(path string, fn http.HandlerFunc) {
 func Put(path string, fn http.HandlerFunc) {
 	r.Router.PUT(path, HandlerFunc(fn))
 }
+
+func PostHandler(path string, handler http.Handler) {
+	r.Router.Handler("POST", path, handler)
+}
