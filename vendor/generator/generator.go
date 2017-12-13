@@ -21,13 +21,17 @@ var const_MyGraphQlPath = "mygraphql"
 var const_ServerPath = "server"
 var const_RoutePath = "route"
 var const_RouterPath = "router"
+var const_GraphQlPath = "github.com/neelance/graphql-go"
+
 var const_OneToOne = "OneToOne"
 var const_OneToMany = "OneToMany"
 var const_ManyToOne = "ManyToOne"
 var const_ManyToMany = "ManyToMany"
+
 var const_reverse = "_reverse"
 var const_normal = "_normal"
 var const_self = "_self"
+var const_resolver = "_resolver"
 
 type Entity struct {
 	ID          int `sql:"AUTO_INCREMENT"`
@@ -232,24 +236,34 @@ func createEntities(entity Entity, db *gorm.DB) string {
 	entityRelationsForAllEndpoint := []EntityRelation{}
 
 	//create entity file in models sub directory
-	file, err := os.Create("vendor/models/" + entityName + ".go")
+	fileModel, err := os.Create("vendor/" + const_ModelsPath + "/" + strings.ToLower(entityName) + ".go")
 	if err != nil {
 		log.Fatal("Cannot create file", err)
 	}
-	defer file.Close()
+	defer fileModel.Close()
 
 	//create controller entity file in controller sub directory
-	file2, err2 := os.Create("vendor/controllers/" + entityName + ".go")
+	fileController, err2 := os.Create("vendor/" + const_ControllersPath + "/" + strings.ToLower(entityName) + ".go")
 	if err2 != nil {
 		log.Fatal("Cannot create file", err2)
 	}
-	defer file2.Close()
+	defer fileController.Close()
+
+	//create resolver entity file in controller sub directory
+	fileResolver, err3 := os.Create("vendor/" + const_MyGraphQlPath + "/" + strings.ToLower(entityName) + const_resolver + ".go")
+	if err3 != nil {
+		log.Fatal("Cannot create file", err3)
+	}
+	defer fileResolver.Close()
 
 	//set package as "models"
-	modelFile := NewFile("models")
+	modelFile := NewFile(const_ModelsPath)
 
 	//set package as "models"
-	controllerFile := NewFile("controllers")
+	controllerFile := NewFile(const_ControllersPath)
+
+	//set package as "models"
+	resolverFile := NewFile(const_MyGraphQlPath)
 
 	//fetch relations of this entity matching parent
 	relationsParent := []Relation{}
@@ -276,7 +290,7 @@ func createEntities(entity Entity, db *gorm.DB) string {
 
 		//write primitive fields
 		for _, column := range entity.Columns {
-			entityFields = append(entityFields, mapColumnTypes(column, g))
+			entityFields = append(entityFields, mapColumnTypesGorm(column, g))
 		}
 
 		//write composite fields while looking at parent
@@ -407,6 +421,31 @@ func createEntities(entity Entity, db *gorm.DB) string {
 		//}
 	})
 
+	//write resolver
+	entityNameLower := strings.ToLower(entityName)
+	resolverFile.Comment("Struct for graphql")
+	resolverFile.Type().Id(entityNameLower).StructFunc(func(g *Group) {
+		//write primitive fields
+		for _, column := range entity.Columns {
+			mapColumnTypesResolver(column, g, false)
+		}
+	})
+
+	resolverFile.Empty()
+	resolverFile.Comment("Struct for upserting")
+	resolverFile.Type().Id(entityNameLower + "Input").StructFunc(func(g *Group) {
+		//write primitive fields
+		for _, column := range entity.Columns {
+			mapColumnTypesResolver(column, g, true)
+		}
+	})
+
+	resolverFile.Empty()
+	resolverFile.Comment("Struct for response")
+	resolverFile.Type().Id(entityNameLower + "Resolver").StructFunc(func(g *Group) {
+		g.Id(entityNameLower).Id(" *").Id(entityNameLower)
+	})
+
 	createEntitiesChildSlice(modelFile, entityName, entityRelationsForAllEndpoint)
 
 	createEntitiesGetAllMethod(modelFile, entityName, getAllMethodName, controllerFile)
@@ -497,8 +536,9 @@ func createEntities(entity Entity, db *gorm.DB) string {
 		createEntitiesAllChildMethod(modelFile, entityName, allMethodName, entityRelationsForAllEndpoint)
 	}
 
-	fmt.Fprintf(file, "%#v", modelFile)
-	fmt.Fprintf(file2, "%#v", controllerFile)
+	fmt.Fprintf(fileModel, "%#v", modelFile)
+	fmt.Fprintf(fileController, "%#v", controllerFile)
+	fmt.Fprintf(fileResolver, "%#v", resolverFile)
 
 	fmt.Println(entityName + " generated")
 	return entityName
@@ -607,7 +647,7 @@ func createEntitiesPutMethod(modelFile *File, entityName string, methodName stri
 		Defer().Qual("", "req.Body.Close").Call(),
 
 		Empty(),
-		Id("newData.Id").Op("=").Qual("","StringToUInt").Call(Id("ID")),
+		Id("newData.Id").Op("=").Qual("", "StringToUInt").Call(Id("ID")),
 		Id("data").Op(":=").Qual(const_ModelsPath, methodName).Call(Id("newData")),
 		setJsonHeader(),
 		sendResponse(Id("data")),
@@ -705,7 +745,7 @@ func createEntitiesAllChildMethod(modelFile *File, entityName string, allMethodN
 	})
 }
 
-func mapColumnTypes(col Column, g *Group) EntityField {
+func mapColumnTypesGorm(col Column, g *Group) EntityField {
 
 	entityField := EntityField{}
 	entityField.FieldName = col.Name
@@ -723,6 +763,41 @@ func mapColumnTypes(col Column, g *Group) EntityField {
 		g.Id(snakeCaseToCamelCase(col.Name)).String() //default string
 	}
 	return entityField
+}
+
+func mapColumnTypesResolver(col Column, g *Group, isInput bool) {
+
+	var fieldName string
+	fieldNameLower := strings.ToLower(col.Name)
+	fieldNameCaps := snakeCaseToCamelCase(col.Name)
+
+	if isInput {
+		fieldName = fieldNameCaps
+	} else {
+		fieldName = fieldNameLower
+	}
+
+	if fieldName == "id" || fieldName == "ID" || fieldName == "Id" {
+
+		finalId := fieldName
+		if isInput {
+			finalId = fieldName + " *"
+		}
+
+		g.Id(finalId).Qual(const_GraphQlPath, "ID")
+		return
+	}
+
+	if col.ColumnType.Type == "int" {
+		finalId := fieldName + " uint"
+		g.Id(finalId)
+	} else if col.ColumnType.Type == "varchar" {
+		finalId := fieldName + " string"
+		g.Id(finalId)
+	} else {
+		g.Id(fieldName).String() //default string
+	}
+	return
 }
 
 //helper methods
