@@ -197,7 +197,7 @@ func createAppMainMainMethod(appMain *File, allModels []string) {
 		Empty(),
 
 		Comment("Load the controller routes"),
-		Qual(const_ControllersPath, "Load").Call(),
+		Qual(const_ControllersPath, "Load").Call(Id("nil")),
 
 		Empty(),
 
