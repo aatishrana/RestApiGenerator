@@ -1,11 +1,8 @@
 package controllers
 
 import (
-	"log"
-	"strconv"
 	"router"
 	"net/http"
-	"strings"
 	"github.com/neelance/graphql-go"
 	"github.com/neelance/graphql-go/relay"
 	"encoding/json"
@@ -31,24 +28,6 @@ func GraphIql(w http.ResponseWriter, req *http.Request) {
 	w.Write(page)
 }
 
-func isValueInList(value string, list []string) bool {
-	for _, v := range list {
-		if strings.ToLower(v) == strings.ToLower(value) {
-			return true
-		}
-	}
-	return false
-}
-
-func StringToUInt(ID string) uint {
-	u64, err := strconv.ParseUint(ID, 10, 32)
-	if err != nil {
-		log.Println(err)
-		return 0
-	}
-	wd := uint(u64)
-	return wd
-}
 
 var page = []byte(`
 <!DOCTYPE html>

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"bytes"
 	"strconv"
+	u "utils"
 )
 
 var const_ConfigPath = "config"
@@ -21,7 +22,12 @@ var const_MyGraphQlPath = "mygraphql"
 var const_ServerPath = "server"
 var const_RoutePath = "route"
 var const_RouterPath = "router"
+var const_UtilsPath = "utils"
 var const_GraphQlPath = "github.com/neelance/graphql-go"
+
+var const_UtilsStringToUInt = "StringToUInt"
+var const_UtilsConvertId = "ConvertId"
+var const_UtilsUintToGraphId = "UintToGraphId"
 
 var const_OneToOne = "OneToOne"
 var const_OneToMany = "OneToMany"
@@ -137,12 +143,34 @@ func GenerateCode(appName string) {
 		allModels = append(allModels, createEntities(entity, database.SQL))
 	}
 
-	//create appName.go
-	file, err := os.Create(appName + ".go")
+	//write root resolver
+	//create resolver.go
+	fileResolver, err := os.Create("vendor/" + const_MyGraphQlPath + "/resolver.go")
 	if err != nil {
 		log.Fatal("Cannot create file", err)
 	}
-	defer file.Close()
+	defer fileResolver.Close()
+	//created file
+	appResolver := NewFile(const_MyGraphQlPath)
+	createResolver(appResolver, allModels)
+
+	//write root schema
+	//create schema.go
+	fileSchema, err := os.Create("vendor/" + const_MyGraphQlPath + "/schema.go")
+	if err != nil {
+		log.Fatal("Cannot create file", err)
+	}
+	defer fileSchema.Close()
+	//created file
+	appSchema := NewFile(const_MyGraphQlPath)
+	createSchema(appSchema, entities)
+
+	//create appName.go
+	fileMain, err := os.Create(appName + ".go")
+	if err != nil {
+		log.Fatal("Cannot create file", err)
+	}
+	defer fileMain.Close()
 	//created file
 	appMain := NewFile("main")
 
@@ -150,7 +178,9 @@ func GenerateCode(appName string) {
 	createAppMain(appMain, allModels)
 
 	//flush xShowroom.go
-	fmt.Fprintf(file, "%#v", appMain)
+	fmt.Fprintf(fileResolver, "%#v", appResolver)
+	fmt.Fprintf(fileSchema, "%#v", appSchema)
+	fmt.Fprintf(fileMain, "%#v", appMain)
 	fmt.Println("=========================")
 	fmt.Println(appName, "generated!!!")
 }
@@ -221,6 +251,82 @@ func createAppMainMainMethod(appMain *File, allModels []string) {
 			Id("conf").Op(".").Id("Server"),
 		),
 	)
+}
+
+func createResolver(resolverFile *File, allModels []string) {
+
+	resolverFile.Type().Id("Resolver").Struct()
+
+	for _, val := range allModels {
+
+		//writing root query resolvers
+		resolverFile.Empty()
+		resolverFile.Comment("query resolver for " + val)
+		resolverFile.Func().Params(Id("r").Id(" *Resolver")).Id(val).Params(Id("args").StructFunc(func(g *Group) {
+			g.Id("ID").Qual(const_GraphQlPath, "ID")
+		})).Params(Id("[] *" + strings.ToLower(val) + "Resolver")).
+			BlockFunc(func(g *Group) {
+			g.Return(Qual("", "Resolve"+val)).Call(Id("args"))
+		})
+
+		// uncomment when create and delete resolvers are done
+
+		////writing root mutation resolvers
+		//resolverFile.Empty()
+		//resolverFile.Comment("create resolver for " + val)
+		//resolverFile.Func().Params(Id("r").Id(" *Resolver")).Id("Create"+val).Params(Id("args").StructFunc(func(g *Group) {
+		//	g.Id("ID").Qual(const_GraphQlPath, "ID")
+		//})).Params(Id("*" + strings.ToLower(val) + "Resolver")).
+		//	BlockFunc(func(g *Group) {
+		//	g.Return(Qual("", "ResolveCreate"+val)).Call(Id("args"))
+		//})
+		//
+		////writing root mutation resolvers
+		//resolverFile.Empty()
+		//resolverFile.Comment("delete resolver for " + val)
+		//resolverFile.Func().Params(Id("r").Id(" *Resolver")).Id("Delete"+val).Params(Id("args").StructFunc(func(g *Group) {
+		//	g.Id("ID").Qual(const_GraphQlPath, "ID")
+		//})).Params(Id("*" + strings.ToLower(val) + "Resolver")).
+		//	BlockFunc(func(g *Group) {
+		//	g.Return(Qual("", "ResolveDelete"+val)).Call(Id("args"))
+		//})
+
+	}
+}
+
+func createSchema(schemaFile *File, allEntities []Entity) {
+
+	sS := ""
+	//write root schema
+	u.SAppend(&sS, "\n")
+	u.SAppend(&sS, "schema {\n")
+	u.SAppend(&sS, "\tquery: Query\n")
+	//u.SAppend(&sS, "\tmutation: Mutation\n")
+	u.SAppend(&sS, "}\n\n")
+
+	//write query schema
+	u.SAppend(&sS, "# The query type, represents all of the entry points into our object graph\n")
+	u.SAppend(&sS, "type Query {\n")
+	for _, val := range allEntities {
+		entityNameLower := strings.ToLower(val.DisplayName)
+		entityNameCaps := snakeCaseToCamelCase(val.DisplayName)
+		u.SAppend(&sS, "\t"+entityNameLower+"(id: ID!) : ["+entityNameCaps+"]!\n")
+	}
+	u.SAppend(&sS, "}\n\n")
+
+	//uncomment when mutation resolvers are done
+
+	////write mutation schema
+	//u.SAppend(&sS, "# The mutation type, represents all updates we can make to our data\n")
+	//u.SAppend(&sS, "type Mutation {\n")
+	//for _, val := range allEntities {
+	//	entityNameLower := strings.ToLower(val.DisplayName)
+	//	entityNameCaps := snakeCaseToCamelCase(val.DisplayName)
+	//	u.SAppend(&sS, "\tcreate"+entityNameCaps+"("+entityNameLower+": "+entityNameCaps+"Input!) : ["+entityNameCaps+"]!\n")
+	//}
+	//u.SAppend(&sS, "}\n\n")
+
+	schemaFile.Var().Id("Schema").Op("=").Id("`" + sS + "`")
 }
 
 //models generation methods
@@ -422,29 +528,7 @@ func createEntities(entity Entity, db *gorm.DB) string {
 	})
 
 	//write resolver
-	entityNameLower := strings.ToLower(entityName)
-	resolverFile.Comment("Struct for graphql")
-	resolverFile.Type().Id(entityNameLower).StructFunc(func(g *Group) {
-		//write primitive fields
-		for _, column := range entity.Columns {
-			mapColumnTypesResolver(column, g, false)
-		}
-	})
-
-	resolverFile.Empty()
-	resolverFile.Comment("Struct for upserting")
-	resolverFile.Type().Id(entityNameLower + "Input").StructFunc(func(g *Group) {
-		//write primitive fields
-		for _, column := range entity.Columns {
-			mapColumnTypesResolver(column, g, true)
-		}
-	})
-
-	resolverFile.Empty()
-	resolverFile.Comment("Struct for response")
-	resolverFile.Type().Id(entityNameLower + "Resolver").StructFunc(func(g *Group) {
-		g.Id(entityNameLower).Id(" *").Id(entityNameLower)
-	})
+	createEntitiesResolver(resolverFile, entityName, entity)
 
 	createEntitiesChildSlice(modelFile, entityName, entityRelationsForAllEndpoint)
 
@@ -544,6 +628,113 @@ func createEntities(entity Entity, db *gorm.DB) string {
 	return entityName
 }
 
+func createEntitiesResolver(resolverFile *File, entityName string, entity Entity) {
+	entityNameLower := strings.ToLower(entityName)
+	resolverFile.Comment("Struct for graphql")
+	resolverFile.Type().Id(entityNameLower).StructFunc(func(g *Group) {
+		//write primitive fields
+		for _, column := range entity.Columns {
+			mapColumnTypesResolver(column, g, false)
+		}
+	})
+	resolverFile.Empty()
+	resolverFile.Comment("Struct for upserting")
+	resolverFile.Type().Id(entityNameLower + "Input").StructFunc(func(g *Group) {
+		//write primitive fields
+		for _, column := range entity.Columns {
+			mapColumnTypesResolver(column, g, true)
+		}
+	})
+	resolverFile.Empty()
+	resolverFile.Comment("Struct for response")
+	resolverFile.Type().Id(entityNameLower + "Resolver").StructFunc(func(g *Group) {
+		g.Id(entityNameLower).Id(" *").Id(entityNameLower)
+	})
+	resolverFile.Empty()
+	resolverFile.Func().Id("Resolve" + entityName).Params(Id("args").StructFunc(func(g *Group) {
+		g.Id("ID").Qual(const_GraphQlPath, "ID")
+	})).Params(Id("response []*").Id(entityNameLower + "Resolver")).BlockFunc(func(g *Group) {
+		g.If(Id("args").Op(".").Id("ID").Op("!=").Lit("")).BlockFunc(func(h *Group) {
+			h.Id("response").Op("=").Qual("", "append").Call(
+				Id("response"),
+				Op("&").Id(entityNameLower + "Resolver").Values(Dict{
+					Id(entityNameLower): Qual("", "Map"+entityName).Call(
+						Qual(const_ModelsPath, "Get"+entityName).Call(
+							Qual(const_UtilsPath, const_UtilsConvertId).Call(
+								Id("args.ID"),
+							),
+						),
+					),
+				}),
+			)
+			h.Return(Id("response"))
+		})
+		g.For(Id("_").Op(",").Id("val").Op(":=").Id("range").Qual(const_ModelsPath, "GetAll"+entityName+"s").Call()).BlockFunc(func(h *Group) {
+			h.Id("response").Op("=").Qual("", "append").Call(
+				Id("response"),
+				Op("&").Id(entityNameLower + "Resolver").Values(Dict{
+					Id(entityNameLower): Qual("", "Map"+entityName).Call(
+						Id("val"),
+					),
+				}),
+			)
+		})
+		g.Return(Id("response"))
+	})
+	resolverFile.Empty()
+	resolverFile.Empty()
+	resolverFile.Comment("Fields resolvers")
+	//scalar types fields
+	for _, column := range entity.Columns {
+
+		fieldNameLower := strings.ToLower(column.Name)
+		fieldNameCaps := snakeCaseToCamelCase(column.Name)
+
+		if fieldNameLower == "id" {
+			resolverFile.Func().Params(Id("r *").Id(entityNameLower + "Resolver")).Id(fieldNameCaps).Params().Params(Qual(const_GraphQlPath, "ID")).BlockFunc(func(g *Group) {
+				g.Return(Id("r").Op(".").Id(entityNameLower).Op(".").Id(fieldNameLower))
+			})
+			continue
+		}
+
+		returnType := "string"
+		if column.ColumnType.Type == "int" {
+			returnType = "uint"
+		}
+
+		resolverFile.Func().Params(Id("r *").Id(entityNameLower + "Resolver")).Id(fieldNameCaps).Params().Params(Id(returnType)).BlockFunc(func(g *Group) {
+			g.Return(Id("r").Op(".").Id(entityNameLower).Op(".").Id(fieldNameLower))
+		})
+	}
+
+	resolverFile.Empty()
+	resolverFile.Comment("Mapper methods")
+	resolverFile.Func().Id("Map" + entityName).Params(Id("model" + entityName).Qual(const_ModelsPath, entityName)).Params(Id("*" + entityNameLower)).BlockFunc(func(g *Group) {
+		g.Empty()
+		g.If(Id("model" + entityName).Op("== (").Qual(const_ModelsPath, entityName).Op("{})")).BlockFunc(func(h *Group) {
+			h.Return(Op("&").Id(entityNameLower).Values())
+		})
+		g.Empty()
+		g.Comment("Create graphql " + entityNameLower + " from " + const_ModelsPath + " " + entityName)
+		g.Id(entityNameLower).Op(":=").Id(entityNameLower).Values(DictFunc(func(d Dict) {
+			for _, column := range entity.Columns {
+
+				fieldNameCaps := snakeCaseToCamelCase(column.Name)
+
+				if column.Name == "id" {
+					//graphql.ID(strconv.Itoa(modelUser.Id)),
+					d[Id(column.Name)] = Qual(const_UtilsPath, const_UtilsUintToGraphId).Call(Id("model" + entityName).Op(".").Id(fieldNameCaps))
+					continue
+				}
+				d[Id(column.Name)] = Id("model" + entityName).Op(".").Id(fieldNameCaps)
+
+			}
+		}))
+		g.Return(Id("&" + entityNameLower))
+	})
+
+}
+
 func createEntitiesChildSlice(modelFile *File, entityName string, entityRelationsForAllEndpoint []EntityRelation) {
 	allChildren := []string{}
 	for _, value := range entityRelationsForAllEndpoint {
@@ -586,7 +777,7 @@ func createEntitiesGetMethod(modelFile *File, entityName string, methodName stri
 	controllerFile.Func().Id(methodName).Params(handlerRequestParams()).Block(
 		Id("params").Op(":=").Qual(const_RouterPath, "Params").Call(Id("req")),
 		Id("ID").Op(":=").Qual("", "params.ByName").Call(Lit("id")),
-		Id("data").Op(":=").Qual(const_ModelsPath, methodName).Call(Qual("", "StringToUInt").Call(Id("ID"))),
+		Id("data").Op(":=").Qual(const_ModelsPath, methodName).Call(Qual(const_UtilsPath, const_UtilsStringToUInt).Call(Id("ID"))),
 		setJsonHeader(),
 		sendResponse(Id("data")),
 	)
@@ -647,7 +838,7 @@ func createEntitiesPutMethod(modelFile *File, entityName string, methodName stri
 		Defer().Qual("", "req.Body.Close").Call(),
 
 		Empty(),
-		Id("newData.Id").Op("=").Qual("", "StringToUInt").Call(Id("ID")),
+		Id("newData.Id").Op("=").Qual(const_UtilsPath, const_UtilsStringToUInt).Call(Id("ID")),
 		Id("data").Op(":=").Qual(const_ModelsPath, methodName).Call(Id("newData")),
 		setJsonHeader(),
 		sendResponse(Id("data")),
@@ -672,7 +863,7 @@ func createEntitiesDeleteMethod(modelFile *File, entityName string, methodName s
 		Comment("Get the parameter id"),
 		Id("params").Op(":=").Qual(const_RouterPath, "Params").Call(Id("req")),
 		Id("ID").Op(":=").Qual("", "params.ByName").Call(Lit("id")),
-		Id("data").Op(":=").Qual(const_ModelsPath, methodName).Call(Qual("", "StringToUInt").Call(Id("ID"))),
+		Id("data").Op(":=").Qual(const_ModelsPath, methodName).Call(Qual(const_UtilsPath, const_UtilsStringToUInt).Call(Id("ID"))),
 		setJsonHeader(),
 		sendResponse(Id("data")),
 	)
