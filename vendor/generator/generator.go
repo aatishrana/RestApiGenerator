@@ -230,8 +230,13 @@ func createAppMainMainMethod(appMain *File, allModels []string) {
 
 		Empty(),
 
+		Comment("Create schema"),
+		Id("schema").Op(":=").Qual(const_GraphQlPath, "MustParseSchema").Call(Qual(const_MyGraphQlPath, "Schema"), Op("&").Qual(const_MyGraphQlPath, "Resolver{}")),
+
+		Empty(),
+
 		Comment("Load the controller routes"),
-		Qual(const_ControllersPath, "Load").Call(Id("nil")),
+		Qual(const_ControllersPath, "Load").Call(Id("schema")),
 
 		Empty(),
 
@@ -325,6 +330,40 @@ func createSchema(schemaFile *File, allEntities []Entity) {
 	//	u.SAppend(&sS, "\tcreate"+entityNameCaps+"("+entityNameLower+": "+entityNameCaps+"Input!) : ["+entityNameCaps+"]!\n")
 	//}
 	//u.SAppend(&sS, "}\n\n")
+
+	for _, val := range allEntities {
+		//entityNameLower := strings.ToLower(val.DisplayName)
+		entityNameCaps := snakeCaseToCamelCase(val.DisplayName)
+
+		u.SAppend(&sS, "type "+entityNameCaps+" {\n")
+		for _, col := range val.Columns {
+			fieldType := "String"
+			if col.ColumnType.Type == "int" {
+				fieldType = "Int"
+			}
+			if col.Name == "id" {
+				fieldType = "ID"
+			}
+
+			u.SAppend(&sS, "\t"+col.Name+": "+fieldType+"!\n")
+		}
+		u.SAppend(&sS, "}\n")
+
+		u.SAppend(&sS, "input "+entityNameCaps+"Input {\n")
+		for _, col := range val.Columns {
+
+			fieldType := "String"
+			if col.ColumnType.Type == "int" {
+				fieldType = "Int"
+			}
+			if col.Name == "id" {
+				fieldType = "ID"
+			}
+
+			u.SAppend(&sS, "\t"+col.Name+": "+fieldType+"!\n")
+		}
+		u.SAppend(&sS, "}\n\n")
+	}
 
 	schemaFile.Var().Id("Schema").Op("=").Id("`" + sS + "`")
 }
@@ -699,7 +738,7 @@ func createEntitiesResolver(resolverFile *File, entityName string, entity Entity
 
 		returnType := "string"
 		if column.ColumnType.Type == "int" {
-			returnType = "uint"
+			returnType = "int32"
 		}
 
 		resolverFile.Func().Params(Id("r *").Id(entityNameLower + "Resolver")).Id(fieldNameCaps).Params().Params(Id(returnType)).BlockFunc(func(g *Group) {
@@ -711,9 +750,12 @@ func createEntitiesResolver(resolverFile *File, entityName string, entity Entity
 	resolverFile.Comment("Mapper methods")
 	resolverFile.Func().Id("Map" + entityName).Params(Id("model" + entityName).Qual(const_ModelsPath, entityName)).Params(Id("*" + entityNameLower)).BlockFunc(func(g *Group) {
 		g.Empty()
-		g.If(Id("model" + entityName).Op("== (").Qual(const_ModelsPath, entityName).Op("{})")).BlockFunc(func(h *Group) {
+
+		//g.If(Id("model" + entityName).Op("== (").Qual(const_ModelsPath, entityName).Op("{})")).BlockFunc(func(h *Group) {
+		g.If(Qual("reflect", "DeepEqual").Call(Id("model"+entityName), Qual(const_ModelsPath, entityName).Op("{}"))).BlockFunc(func(h *Group) {
 			h.Return(Op("&").Id(entityNameLower).Values())
 		})
+
 		g.Empty()
 		g.Comment("Create graphql " + entityNameLower + " from " + const_ModelsPath + " " + entityName)
 		g.Id(entityNameLower).Op(":=").Id(entityNameLower).Values(DictFunc(func(d Dict) {
@@ -726,6 +768,12 @@ func createEntitiesResolver(resolverFile *File, entityName string, entity Entity
 					d[Id(column.Name)] = Qual(const_UtilsPath, const_UtilsUintToGraphId).Call(Id("model" + entityName).Op(".").Id(fieldNameCaps))
 					continue
 				}
+
+				if column.ColumnType.Type == "int" {
+					d[Id(column.Name)] = Qual("", "int32").Call(Id("model" + entityName).Op(".").Id(fieldNameCaps))
+					continue
+				}
+
 				d[Id(column.Name)] = Id("model" + entityName).Op(".").Id(fieldNameCaps)
 
 			}
@@ -980,7 +1028,7 @@ func mapColumnTypesResolver(col Column, g *Group, isInput bool) {
 	}
 
 	if col.ColumnType.Type == "int" {
-		finalId := fieldName + " uint"
+		finalId := fieldName + " int32"
 		g.Id(finalId)
 	} else if col.ColumnType.Type == "varchar" {
 		finalId := fieldName + " string"
